@@ -73,6 +73,10 @@ public class MainActivity extends AppCompatActivity {
             app:rewind_increment="10000"
          */
 
+		/* 
+			Establecemos los flags de la Pantalla para que la aplicación se ejecute en pantalla completa
+			de modo que se oculte la barra de notificaciones.
+		*/
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         zoomVideo();
 
@@ -85,6 +89,10 @@ public class MainActivity extends AppCompatActivity {
         playerView = findViewById(R.id.playerView);
         mExoLock = findViewById(R.id.exo_lock);
         mExoControls = findViewById(R.id.exo_controls);
+		
+		/*
+			Creamos la función detectora de gestos para poder acercar o alejar la pantalla pellizcandola.
+		*/
         scaleGestureDetector = new ScaleGestureDetector(mContext, new CustomOnScaleGestureListener(
                 new PinchListener() {
                     @Override
@@ -103,12 +111,15 @@ public class MainActivity extends AppCompatActivity {
                 }
         ));
 
+
+		// Creamos el hilo de escucha del modo picture in picture
         mExoPiP.setOnClickListener(view -> {
             try{
                 enterPIPMode();
             }catch(Exception err){}
         });
 
+		// Creamos el hilo de escucha para rotar la pantalla de portrait a landscape y a la inversa.
         mExoRotate.setOnClickListener(view -> {
             int orientation = getResources().getConfiguration().orientation;
             if(orientation == Configuration.ORIENTATION_PORTRAIT)
@@ -122,6 +133,10 @@ public class MainActivity extends AppCompatActivity {
         startPlaying(url);
     }
 
+	/**
+		Mostramos la barra/UI de manejo del vídeo y la barra de tiempo.
+		@variable msg String
+	*/
     private void showSnack(String msg){
         CoordinatorLayout coordinatorLayout = (CoordinatorLayout) findViewById(R.id.coordinator);
         Snackbar snackbar = Snackbar.make(coordinatorLayout, msg, Snackbar.LENGTH_LONG);
@@ -137,6 +152,10 @@ public class MainActivity extends AppCompatActivity {
         snackbar.show();
     }
 
+	/**
+		Inicializamos la reproducción del vídeo
+		@variable url String: Url local donde se encuentra el vídeo que vamos a reproducir.
+	*/
     private void startPlaying(String url){
         this.url=url;
         openPlayer();
@@ -239,5 +258,38 @@ public class MainActivity extends AppCompatActivity {
         SimpleExoPlayer.Builder builder = new SimpleExoPlayer.Builder(mContext,
                 new DefaultRenderersFactory(mContext))
                 .setLoadControl(bl.createDefaultLoadControl());
-    }
+				
+		player=builder.build();
+		player.setVideoScalingMode(VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING); //C.
+		playerView.setPlayer(player);
+		playerView.setOnTouchListener(view, notionEvent -> {
+			scaleGestureDetector.onTouchEvent(notionEvent);
+            return false;
+        });
+		
+		playerView.setKeepScreenOn(true); //Mantenemos la pantalla encendida
+		playerView.requestFocus();
+		playerView.setControllerVisibilityListener(visibility -> {
+            if (visibility==View.VISIBLE){
+				if(!locked)
+					showActionBar(true);
+			}else showActionBar(false);
+        });
+		
+		DefaultDataSourceFactory defaultDataSource = new DefaultDataSourceFactory(mContext,"");
+		MediaSource mediaSource = new ProgressiveMediaSource.Factory(defaultDataSource)
+				.createMediaSource(Uri.parse(url));
+		
+		player.prepare(mediaSource);
+		player.setPlayWhenReady(true);
+		
+		MediaSessionCompat mediaSession = new MediaSessionCompat(mContext, getPackageName());
+		MediaSessionConnector mediaSessionConnector = new MediaSessionConnector(mediaSession);
+		mediaSessionConnector.setPlayer(player);
+		mediaSession.setActive(true);
+		
+		tv.setText(title);
+		if (!playerView.getUseController())
+			playerView.setUseController(true);
+	}
 }

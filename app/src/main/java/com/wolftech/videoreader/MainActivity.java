@@ -16,9 +16,11 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
+import android.support.v4.media.session.MediaSessionCompat;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.Window;
@@ -29,12 +31,18 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.ExoPlayer;
+import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector;
+import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.ui.AspectRatioFrameLayout;
 import com.google.android.exoplayer2.ui.PlayerView;
+import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.material.snackbar.Snackbar;
 import com.wolftech.videoreader.services.CustomOnScaleGestureListener;
 import com.wolftech.videoreader.services.PinchListener;
@@ -260,10 +268,10 @@ public class MainActivity extends AppCompatActivity {
                 .setLoadControl(bl.createDefaultLoadControl());
 				
 		player=builder.build();
-		player.setVideoScalingMode(VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING); //C.
+		player.setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING); //C.
 		playerView.setPlayer(player);
-		playerView.setOnTouchListener(view, notionEvent -> {
-			scaleGestureDetector.onTouchEvent(notionEvent);
+        playerView.setOnTouchListener((view, notionEvent) -> {
+            scaleGestureDetector.onTouchEvent(notionEvent);
             return false;
         });
 		
@@ -278,7 +286,7 @@ public class MainActivity extends AppCompatActivity {
 		
 		DefaultDataSourceFactory defaultDataSource = new DefaultDataSourceFactory(mContext,"");
 		MediaSource mediaSource = new ProgressiveMediaSource.Factory(defaultDataSource)
-				.createMediaSource(Uri.parse(url));
+				.createMediaSource(MediaItem.fromUri(Uri.parse(url)));
 		
 		player.prepare(mediaSource);
 		player.setPlayWhenReady(true);

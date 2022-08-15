@@ -138,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
         mExoPiP.setOnClickListener(view -> {
             try{
                 enterPIPMode();
-            }catch(Exception err){}
+            }catch(Exception ignored){}
         });
 
 		// Creamos el hilo de escucha para rotar la pantalla de portrait a landscape y a la inversa.
@@ -384,7 +384,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode,
                                               Configuration newConfig) {
-        super.onPictureInPictureModeChanged(isInPictureInPictureMode);
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
         if (isInPictureInPictureMode){
             startPlayer();
             playerView.setUseController(false);

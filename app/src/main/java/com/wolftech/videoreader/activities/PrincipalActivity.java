@@ -177,17 +177,17 @@ public class PrincipalActivity extends AppCompatActivity {
 		@variable url String: Url local donde se encuentra el vídeo que vamos a reproducir.
 	*/
     private void startPlaying(){
-        if (url ==null)
+        Uri data = getIntent().getData();
+        if (data == null)
             seleccionarVideo();
         else {
-            retrieveExtras();
+            retrieveExtras(data);
             openPlayer();
         }
     }
 
-    private void retrieveExtras(){
+    private void retrieveExtras(Uri data){
         try{
-            Uri data = getIntent().getData();
             url = data.toString();
             Cursor returnCursor = getContentResolver().query(data, null, null, null,null);
             int nameIndex = returnCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
@@ -497,7 +497,7 @@ public class PrincipalActivity extends AppCompatActivity {
                 url = selectedImageUri.toString();
                 openPlayer();
             //}
-        }
+        }else finish();
     }
 
     private void seleccionarVideo() {
@@ -519,9 +519,10 @@ public class PrincipalActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PETICION_PERMISOS) {
-            if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "Permission granted", Toast.LENGTH_SHORT).show();
-                onRestart();
+            if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Intent intent = getIntent();
+                finish();
+                startActivity(intent);
             }
         }
     }

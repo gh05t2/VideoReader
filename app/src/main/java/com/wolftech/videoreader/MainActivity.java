@@ -1,25 +1,35 @@
 package com.wolftech.videoreader;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.content.ContextCompat;
 
+import android.app.PendingIntent;
+import android.app.PictureInPictureParams;
+import android.app.RemoteAction;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.graphics.Color;
+import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.text.TextUtils;
+import android.util.Rational;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
@@ -36,6 +46,7 @@ import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector;
 import com.google.android.exoplayer2.source.MediaSource;
@@ -46,6 +57,9 @@ import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.material.snackbar.Snackbar;
 import com.wolftech.videoreader.services.CustomOnScaleGestureListener;
 import com.wolftech.videoreader.services.PinchListener;
+import com.wolftech.videoreader.util.Widget;
+
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -300,4 +314,174 @@ public class MainActivity extends AppCompatActivity {
 		if (!playerView.getUseController())
 			playerView.setUseController(true);
 	}
+
+    private void releasePlayer(boolean finish) {
+        if (player != null){
+            if (finish){
+                player.release();
+                playerView.setPlayer(null);
+                finish();
+            }else pausePlayer();
+        }else finish();
+    }
+
+    private void enterPIPMode(){
+        if(Widget.canPip(mContext)){
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+                Rational aspectRatio = new Rational(playerView.getWidth(), playerView.getHeight());
+                PictureInPictureParams.Builder params = new PictureInPictureParams.Builder();
+                params.setAspectRatio(aspectRatio);
+                enterPictureInPictureMode(params.build());
+            }else enterPictureInPictureMode();
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+
+        if (hasFocus)
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    public void createPipAction(){
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+            final ArrayList<RemoteAction> actions = new ArrayList<>();
+            Intent actionItent = new Intent("com.wolftech.videoreader.PLAY_PAUSE");
+
+            final PendingIntent pendingIntent = PendingIntent.getBroadcast(mContext,
+                    REQUEST_CODE, actionItent, PendingIntent.FLAG_IMMUTABLE);
+
+            Icon icon = Icon.createWithResource(mContext,
+                    player != null && player.getPlayWhenReady() ? R.drawable.ic_action_pause : R.drawable.ic_action_play);
+
+            RemoteAction remoteAction = new RemoteAction(icon, "Player", "Play", pendingIntent);
+
+            actions.add(remoteAction);
+            PictureInPictureParams params = new PictureInPictureParams.Builder()
+                    .setActions(actions)
+                    .build();
+            setPictureInPictureParams(params);
+        }
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if ((keyCode ==  KeyEvent.KEYCODE_BACK ||
+                keyCode ==  KeyEvent.KEYCODE_MENU ||
+                keyCode ==  KeyEvent.KEYCODE_HOME) && locked){
+            return false;
+        }
+
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode,
+                                              Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode);
+        if (isInPictureInPictureMode){
+            startPlayer();
+            playerView.setUseController(false);
+            floating = true;
+            showActionBar(false);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+                IntentFilter filter = new IntentFilter();
+                filter.addAction("com.wolftech.videoreader.PLAY_PAUSE");
+                mReceiver = new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        if (player !=  null){
+                            boolean state = !player.getPlayWhenReady();
+                            player.setPlayWhenReady(state);
+                            createPipAction();
+                        }
+                    }
+                };
+
+                registerReceiver(mReceiver, filter);
+                createPipAction();
+            }
+        }else {
+            playerView.setUseController(true);
+            floating = false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && mReceiver != null)
+                unregisterReceiver(mReceiver);
+        }
+    }
+
+
+    private void pausePlayer() {
+        if (player != null){
+            try{
+                if(player.getPlaybackState() == Player.STATE_READY && player.getPlayWhenReady())
+                    player.setPlayWhenReady(false);
+            }catch (Exception ignore){}
+        }
+    }
+
+    private void startPlayer() {
+        if (player != null){
+            try{
+                if(player.getPlaybackState() == Player.STATE_READY && player.getPlayWhenReady())
+                    player.setPlayWhenReady(true);
+            }catch (Exception ignore){}
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        showActionBar(true);
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode() && floating)
+            releasePlayer(false);
+        else pausePlayer();
+
+        super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        if (floating)
+            releasePlayer(true);
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode() && floating)
+            releasePlayer(false);
+        else pausePlayer();
+
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        releasePlayer(true);
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        startPlayer();
+    }
+
+    @Override
+    public void onBackPressed() {
+        releasePlayer(true);
+        super.onBackPressed();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+        if (id == android.R.id.home){
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
 }

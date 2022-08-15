@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/colorBlack">
+    android:background="@android:color/transparent">
 
     <FrameLayout
         android:padding="@dimen/_10sdp"
@@ -25,7 +25,7 @@
                 <ImageView
                     android:id="@+id/exo_lock"
                     app:tint="@color/colorText"
-                    android:src="@drawable/ic_action_lock"
+                    android:src="@drawable/ic_action_lockopen"
                     android:scaleType="centerCrop"
                     android:background="@android:color/transparent"
                     android:layout_gravity="start"
